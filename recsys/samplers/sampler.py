@@ -48,7 +48,7 @@ class Sampler(object):
 
         for ind in range(self._num_process):
             runner = _Process(self._queue, self._generate_batch)
-            runner.deamon = False
+            runner.deamon = True
             self._runner_list.append(runner)
             runner.start()
 
