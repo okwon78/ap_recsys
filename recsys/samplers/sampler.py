@@ -1,3 +1,4 @@
+import os
 import multiprocessing
 from multiprocessing import Queue, Process
 
@@ -11,7 +12,9 @@ class _Process(Process):
 
     def run(self):
         for input in self._generate_batch():
+            print(f'pid: {os.getpid()} = ', f'recved: {len(input)}')
             self._queue.put(input, block=True)
+            print('added data to queue')
 
 
 class Sampler(object):
@@ -31,8 +34,13 @@ class Sampler(object):
     def next_batch(self):
         if not self._start:
             self.reset()
-
+        print('read from queue')
         return self._queue.get(block=True)
+
+    def next_batch_debug(self):
+        input = next(self._generate_batch())
+        return input
+
 
     def reset(self):
 

@@ -1,3 +1,5 @@
+import os
+
 import tensorflow as tf
 import numpy as np
 
@@ -15,18 +17,18 @@ class ApRecsys(object):
         self._embedding_size = 20
         self._dim_item_embed = 50
         self._max_seq_len = 5
-        self._total_iter = int(1e3)
         self._batch_size = 100
         self._eval_iter = 100
         self._train_percentage = 0.9
-        self._model = Model('ap_recsys_dir')
+        self._model = Model()
+        self._save_model_dir = './model'
         self._train_tensors = None
         self._serve_tensors = None
         self._train_session = None
         self._serve_session = None
         self._train_saver = None
         self._serve_saver = None
-
+        self._train_writer = None
 
     @property
     def batch_size(self):
@@ -71,6 +73,9 @@ class ApRecsys(object):
     def make_raw_data(self):
         self._mongo.make_raw_data()
 
+    def make_movie_index(self):
+        self._mongo.make_movie_index()
+
     def _train_batch(self):
 
         low_pos = self._mongo.total_raw_data * self._train_percentage
@@ -80,15 +85,25 @@ class ApRecsys(object):
                                         ('seq_len', np.int32),
                                         ('label', np.int32)])
 
-            index_list = np.random.randint(low=low_pos, high=self._mongo.total_raw_data - 1, size=self._batch_size)
-            watch_histories_sample = [self._mongo.get_watch_list(ind) for ind in index_list]
+            watch_histories_sample = []
+            while True:
+                index = np.random.randint(low=low_pos, high=self._mongo.total_raw_data - 1)
+                watch_history = self._mongo.get_watch_list(index)
+                if watch_history is not None:
+                    watch_histories_sample.append(watch_history)
+
+                if len(watch_histories_sample) == self._batch_size:
+                    break
 
             for ind, watch_history in enumerate(watch_histories_sample):
-                predict_pos = np.random.randint(1, len(watch_history) - 1)
+                predict_pos = np.random.randint(low=1, high=len(watch_history))
                 train_items = watch_history[max(0, predict_pos - self._max_seq_len): predict_pos]
+                train_items = [self._mongo.get_index_from_movieId(movieId) for movieId in train_items]
+
                 pad_train_items = np.zeros(self.max_seq_len, np.int32)
                 pad_train_items[:len(train_items)] = train_items
-                input_npy[ind] = (pad_train_items, len(train_items), watch_history[predict_pos])
+                predict_index = self._mongo.get_index_from_movieId(watch_history[predict_pos])
+                input_npy[ind] = (pad_train_items, len(train_items), predict_index)
 
             yield input_npy
 
@@ -113,11 +128,11 @@ class ApRecsys(object):
                 pad_train_items[:len(train_items)] = train_items
                 input_npy[0] = (pad_train_items, len(train_items))
                 yield train_items[predict_pos], input_npy
-                # yield [] []
+                yield [], []
             yield None, None
 
     def get_train_sampler(self):
-        return Sampler(generate_batch=self._train_batch)
+        return Sampler(generate_batch=self._train_batch, num_process=1)
 
     def get_test_sampler(self):
         return Sampler(generate_batch=self._test_batch, num_process=1)
@@ -132,20 +147,24 @@ class ApRecsys(object):
 
         train_graph = self._model.get_train_graph()
 
+        self._train_writer = tf.summary.FileWriter('graphs', train_graph)
+
         with train_graph.as_default():
             self._train_session = tf.Session()
             self._train_session.run(tf.global_variables_initializer())
             self._train_saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
-
+            self.restore()
 
     def build_serve_model(self):
 
         self._serve_tensors = self._model.build_serve_model(embedding_size=self._embedding_size,
-                                                           dim_item_embed=self.dim_item_embed,
-                                                           total_items=self._mongo.total_movies,
-                                                           max_seq_len=self.max_seq_len)
+                                                            dim_item_embed=self.dim_item_embed,
+                                                            total_items=self._mongo.total_movies,
+                                                            max_seq_len=self.max_seq_len)
 
         serve_graph = self._model.get_serve_graph()
+
+        tf.summary.FileWriter('graphs', serve_graph)
 
         with serve_graph.as_default():
             self._serve_session = tf.Session()
@@ -155,10 +174,12 @@ class ApRecsys(object):
     def train(self, batch_data):
         """train"""
         train_graph = self._model.get_train_graph()
-        serve_graph = self._model.get_serve_graph()
-        losses = self._train_tensors['losses']
+        loss = self._train_tensors['loss']
+        backprop = self._train_tensors['backprop']
 
-        with train_graph.tf_graph.as_default():
+        tf.summary.scalar('loss', loss)
+
+        with train_graph.as_default():
 
             feed_dict = {
                 self._train_tensors['seq_item_id']: batch_data['seq_item_id'],
@@ -166,31 +187,51 @@ class ApRecsys(object):
                 self._train_tensors['label']: batch_data['label']
             }
 
-            return self._train_session.run([losses])
+            merged = tf.summary.merge_all()
+            _, summary, loss_value = self._train_session.run([backprop, merged, loss], feed_dict=feed_dict)
+            return loss_value
+
+    def save(self, step):
+        with self._model.get_train_graph().as_default():
+            self._train_saver.save(self._train_session, os.path.join(self._save_model_dir, 'model.ckpt'))
+
+    def restore(self):
+        if not os.path.exists(self._save_model_dir):
+            return
+
+        # saved_dir = os.path.join(self._save_model_dir, 'model.ckpt')
+        self._train_saver.restore(self._train_session, os.path.join(self._save_model_dir, 'model.ckpt'))
 
 
 def main():
-
     ap_model = ApRecsys(host='13.209.6.203',
                         username='romi',
                         password="Amore12345!",
                         db_name='recsys')
 
     # ap_model.make_raw_data()
+    ap_model.make_movie_index()
 
     train_sampler = ap_model.get_train_sampler()
-    #test_sampler = ap_model.get_test_sampler()
+    # test_sampler = ap_model.get_test_sampler()
 
     ap_model.build_train_model()
     ap_model.build_serve_model()
 
     acc_loss = 0
-    for _ in range(ap_model.total_iter):
-        batch_data = train_sampler.next_batch()
-        print(batch_data)
-        # loss = np.sum(ap_model.train(batch_data))
-        # acc_loss += loss
+    total_iter = 0
+    while True:
+        batch_data = train_sampler.next_batch_debug()
+        loss = ap_model.train(batch_data)
 
+        acc_loss += loss
+        total_iter += 1
+        print(f'[{total_iter}] acc_loss: {acc_loss}, loss: {loss}')
+
+        if total_iter % ap_model.eval_iter == 0:
+            ap_model.save(step=total_iter)
+            print('model saved')
+            acc_loss = 0
 
 
 if __name__ == '__main__':

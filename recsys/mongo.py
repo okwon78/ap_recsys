@@ -8,7 +8,8 @@ from recsys.samplers.sampler import Sampler
 
 class Mongo(object):
 
-    def __init__(self, username, password, host, db_name, port=27017, authSource='admin', authMechanism='SCRAM-SHA-256'):
+    def __init__(self, username, password, host, db_name, port=27017, authSource='admin',
+                 authMechanism='SCRAM-SHA-256'):
 
         self._host = host
         self._port = port
@@ -20,9 +21,12 @@ class Mongo(object):
                                            authSource='admin',
                                            authMechanism='SCRAM-SHA-256')
 
+        print('connected mongodb: ', self._pid)
         self._db_name = db_name
         self._db = self._client.__getattr__(db_name)
         self._total_movies = self._db.movies.count()
+        self._movies_to_index = dict()
+        self._index_to_movies = dict()
         self._total_users = self._db.ratings.count()
         self._total_raw_data = self._db.raw_data.count()
 
@@ -37,6 +41,8 @@ class Mongo(object):
         if pid == self._pid:
             return self._db
         else:
+            self._pid = pid
+            print('pid: ', pid)
             self._client = pymongo.MongoClient(host=self._host,
                                                port=self._port,
                                                username='romi',
@@ -45,10 +51,9 @@ class Mongo(object):
                                                authMechanism='SCRAM-SHA-256')
 
             self._db = self._client.__getattr__(self._db_name)
+
+            print('connected mongodb')
             return self._db
-
-
-
 
     def make_raw_data(self, batch_size=1000):
         ratings = self.db.ratings
@@ -91,6 +96,17 @@ class Mongo(object):
 
         self._total_raw_data = self.db.raw_data.count()
 
+    def make_movie_index(self):
+        projection = {
+            '_id': 0,
+            'index': 1,
+            'movieId': 1
+        }
+
+        for doc in self.db.movies.find({}, projection):
+            self._movies_to_index[doc['movieId']] = doc['index']
+            self._index_to_movies[doc['index']] = doc['movieId']
+
     def get_watch_list(self, index):
         if self._total_raw_data == 0:
             return None
@@ -101,6 +117,11 @@ class Mongo(object):
         except Exception as e:
             print(e)
 
+    def get_index_from_movieId(self, movieId):
+        return self._movies_to_index[movieId]
+
+    def get_movieId_from_index(self, index):
+        return self._index_to_movies[index]
 
     @property
     def total_movies(self):
@@ -113,5 +134,3 @@ class Mongo(object):
     @property
     def total_raw_data(self):
         return self._total_raw_data
-
-
