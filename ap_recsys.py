@@ -25,8 +25,8 @@ class ApRecsys(object):
         self._train_percentage = 0.9
         self._model = Model()
         self._save_model_dir = './model'
-        self._train_summary_path = '/Users/amore/Dev/ap_recsys/train'
-        self._serve_summary_path = '/Users/amore/Dev/ap_recsys/serve'
+        self._train_summary_path = './train'
+        self._serve_summary_path = './serve'
         self._train_tensors = None
         self._serve_tensors = None
         self._train_session = None
