@@ -21,7 +21,7 @@ class ApRecsys(object):
         self._dim_item_embed = 50
         self._max_seq_len = 5
         self._batch_size = 100
-        self._eval_iter = 10
+        self._eval_iter = 100
         self._train_percentage = 0.9
         self._model = Model()
         self._save_model_dir = './model'
