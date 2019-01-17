@@ -1,6 +1,7 @@
 /.idea
 /model
-/graphs
 /ml-20m
+/train
+/serve
 *.pyc
 *.pyo

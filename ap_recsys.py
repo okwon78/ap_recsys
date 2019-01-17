@@ -1,4 +1,5 @@
 import os
+import shutil
 
 import tensorflow as tf
 import numpy as np
@@ -6,6 +7,8 @@ import numpy as np
 from recsys.model import Model
 from recsys.mongo import Mongo
 from recsys.samplers.sampler import Sampler
+
+print(tf.__version__)
 
 
 class ApRecsys(object):
@@ -18,10 +21,12 @@ class ApRecsys(object):
         self._dim_item_embed = 50
         self._max_seq_len = 5
         self._batch_size = 100
-        self._eval_iter = 100
+        self._eval_iter = 10
         self._train_percentage = 0.9
         self._model = Model()
         self._save_model_dir = './model'
+        self._train_summary_path = '/Users/amore/Dev/ap_recsys/train'
+        self._serve_summary_path = '/Users/amore/Dev/ap_recsys/serve'
         self._train_tensors = None
         self._serve_tensors = None
         self._train_session = None
@@ -70,6 +75,13 @@ class ApRecsys(object):
     @eval_iter.setter
     def eval_iter(self, value):
         self._eval_iter = value
+
+    @property
+    def train_writer(self):
+        if self._train_writer is None:
+            raise Exception
+
+        return self._train_writer
 
     def make_raw_data(self):
         self._mongo.make_raw_data()
@@ -146,14 +158,12 @@ class ApRecsys(object):
                                                             total_items=self._mongo.total_movies,
                                                             max_seq_len=self.max_seq_len)
 
-        train_graph = self._model.get_train_graph()
-
-        with train_graph.as_default():
+        with self._model.get_train_graph().as_default():
             self._train_session = tf.Session()
             self._train_session.run(tf.global_variables_initializer())
             self._train_saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
-            self._train_writer = tf.summary.FileWriter('graphs', train_graph)
             self.restore()
+            self._train_writer = tf.summary.FileWriter(self._train_summary_path, self._model.get_train_graph())
 
     def build_serve_model(self):
 
@@ -162,31 +172,28 @@ class ApRecsys(object):
                                                             total_items=self._mongo.total_movies,
                                                             max_seq_len=self.max_seq_len)
 
-        serve_graph = self._model.get_serve_graph()
-
-        with serve_graph.as_default():
+        with self._model.get_serve_graph().as_default():
             self._serve_session = tf.Session()
             self._serve_session.run(tf.global_variables_initializer())
             self._serve_saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
-            self._serve_writer = tf.summary.FileWriter('graphs', serve_graph)
+            self._serve_writer = tf.summary.FileWriter(self._serve_summary_path, self._model.get_serve_graph())
 
     def train(self, step, batch_data):
         """train"""
-        train_graph = self._model.get_train_graph()
-        loss = self._train_tensors['loss']
-        backprop = self._train_tensors['backprop']
-        summary = self._train_tensors['summary']
+        with self._model.get_train_graph().as_default():
+            loss = self._train_tensors['loss']
+            backprop = self._train_tensors['backprop']
+            summary = self._train_tensors['summary']
 
-        tf.summary.scalar('loss', loss)
+            tf.summary.scalar('loss', loss)
 
-        with train_graph.as_default():
             feed_dict = {
                 self._train_tensors['seq_item_id']: batch_data['seq_item_id'],
                 self._train_tensors['seq_len']: batch_data['seq_len'],
                 self._train_tensors['label']: batch_data['label']
             }
 
-            backprop_, summary_, loss_ = self._train_session.run([backprop, summary, loss], feed_dict=feed_dict)
+            backprop, loss_, summary_ = self._train_session.run([backprop, loss, summary], feed_dict=feed_dict)
             self._train_writer.add_summary(summary_, step)
             return loss_
 
@@ -227,10 +234,16 @@ def main():
         total_iter += 1
         print(f'[{total_iter}] loss: {loss}')
 
-        if total_iter % ap_model.eval_iter == 0:
+        if total_iter % ap_model.eval_iter == 0 or total_iter == 1:
+            summary = tf.Summary()
+
             ap_model.save(step=total_iter)
             print('model saved')
-            print(f'[{total_iter}] avg_loss: {acc_loss / ap_model.eval_iter}')
+            avg_loss = acc_loss / ap_model.eval_iter
+            print(f'[{total_iter}] avg_loss: {avg_loss}')
+            # summary.value.add(tag='avg_loss', simple_value=avg_loss)
+            # ap_model.train_writer.add_summary(summary, total_iter)
+            # ap_model.train_writer.flush()
             acc_loss = 0
 
 

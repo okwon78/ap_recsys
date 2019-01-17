@@ -38,17 +38,14 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
 
         _in = _out
 
-        mat = tf.get_variable('FC_2',
-                              shape=(_in.shape[1], total_items),
+        _item_embedding = tf.get_variable('FC_2',
+                              shape=(dim_item_embed, total_items),
                               trainable=True,
                               initializer=tf.contrib.layers.xavier_initializer())
 
-        _bias = tf.get_variable('bias_2', shape=(total_items,), trainable=True,
-                                initializer=tf.constant_initializer(value=0.0, dtype=tf.float32))
+        _logits = tf.matmul(_in, _item_embedding)
 
-        _logits = tf.matmul(_in, mat) + _bias
-
-        return _logits
+        return _logits, _item_embedding
 
 
 def get_mlp_softmax(name, tensor_seq_vec, tensor_label, tensor_seq_len, max_seq_len, dim_item_embed,
@@ -60,16 +57,16 @@ def get_mlp_softmax(name, tensor_seq_vec, tensor_label, tensor_seq_len, max_seq_
 
         in_tensor = tf.concat(values=[item], axis=1)
 
-        _logits = get_MultiLayerFC(name='mlp',
-                                   dim_item_embed=dim_item_embed,
-                                   total_items=total_items,
-                                   tensor_in_tensor=in_tensor)
+        _logits, _item_embedding = get_MultiLayerFC(name='mlp',
+                                                    dim_item_embed=dim_item_embed,
+                                                    total_items=total_items,
+                                                    tensor_in_tensor=in_tensor)
 
         tf.summary.histogram('logits', _logits)
 
         if train:
-            loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tensor_label, logits=_logits)
-            return loss
+            _loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tensor_label, logits=_logits)
+            return _loss
         else:
             return _logits
 
@@ -83,12 +80,12 @@ class Model(object):
     def build_train_model(self, batch_size, embedding_size, dim_item_embed, total_items, max_seq_len):
         """ build train model"""
 
-        tensors = dict()
         with self._train_graph.as_default():
             seq_item_id = tf.placeholder(tf.int32, shape=(batch_size, max_seq_len), name='seq_item_id')
             seq_len = tf.placeholder(tf.int32, shape=(batch_size,), name='seq_len')
             label = tf.placeholder(tf.int32, shape=(batch_size,), name='label')
 
+            tensors = dict()
             tensors['seq_item_id'] = seq_item_id
             tensors['seq_len'] = seq_len
             tensors['label'] = label
@@ -98,7 +95,7 @@ class Model(object):
                                            total_items=total_items,
                                            tensor_id=seq_item_id)
 
-            losses = get_mlp_softmax(name='mlp',
+            losses = get_mlp_softmax(name='mlp_softmax',
                                      tensor_seq_vec=seq_vec,
                                      tensor_label=label,
                                      tensor_seq_len=seq_len,
@@ -108,7 +105,6 @@ class Model(object):
                                      train=True)
 
             loss_mean = tf.reduce_mean(losses)
-
 
             optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
             backprop = optimizer.minimize(loss_mean)
@@ -126,11 +122,11 @@ class Model(object):
     def build_serve_model(self, embedding_size, dim_item_embed, total_items, max_seq_len):
         """ build model for serving and evaluation"""
 
-        tensors = dict()
         with self._serv_graph.as_default():
             seq_item_id = tf.placeholder(tf.int32, shape=(None, max_seq_len), name='seq_item_id')
             seq_len = tf.placeholder(tf.int32, shape=(None,), name='seq_len')
 
+            tensors = dict()
             tensors['seq_item_id'] = seq_item_id
             tensors['seq_len'] = seq_len
 

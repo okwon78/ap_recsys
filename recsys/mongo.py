@@ -21,7 +21,8 @@ class Mongo(object):
                                            authSource='admin',
                                            authMechanism='SCRAM-SHA-256')
 
-        print('connected mongodb: ', self._pid)
+        print('Successfully connected to mongodb')
+
         self._db_name = db_name
         self._db = self._client.__getattr__(db_name)
         self._total_movies = self._db.movies.count()
