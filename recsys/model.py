@@ -65,6 +65,8 @@ def get_mlp_softmax(name, tensor_seq_vec, tensor_label, tensor_seq_len, max_seq_
                                    total_items=total_items,
                                    tensor_in_tensor=in_tensor)
 
+        tf.summary.histogram('logits', _logits)
+
         if train:
             loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tensor_label, logits=_logits)
             return loss
@@ -83,9 +85,9 @@ class Model(object):
 
         tensors = dict()
         with self._train_graph.as_default():
-            seq_item_id = tf.placeholder(tf.int32, shape=(None, max_seq_len), name='seq_item_id')
-            seq_len = tf.placeholder(tf.int32, shape=(None,), name='seq_len')
-            label = tf.placeholder(tf.int32, shape=(None,), name='label')
+            seq_item_id = tf.placeholder(tf.int32, shape=(batch_size, max_seq_len), name='seq_item_id')
+            seq_len = tf.placeholder(tf.int32, shape=(batch_size,), name='seq_len')
+            label = tf.placeholder(tf.int32, shape=(batch_size,), name='label')
 
             tensors['seq_item_id'] = seq_item_id
             tensors['seq_len'] = seq_len
@@ -106,11 +108,18 @@ class Model(object):
                                      train=True)
 
             loss_mean = tf.reduce_mean(losses)
+
+
             optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
             backprop = optimizer.minimize(loss_mean)
 
+            tf.summary.histogram('losses', losses)
+            tf.summary.scalar('loss_mean', loss_mean)
+            summary = tf.summary.merge_all()
+
             tensors['loss'] = loss_mean
             tensors['backprop'] = backprop
+            tensors['summary'] = summary
 
             return tensors
 

@@ -29,6 +29,7 @@ class ApRecsys(object):
         self._train_saver = None
         self._serve_saver = None
         self._train_writer = None
+        self._serve_writer = None
 
     @property
     def batch_size(self):
@@ -147,12 +148,11 @@ class ApRecsys(object):
 
         train_graph = self._model.get_train_graph()
 
-        self._train_writer = tf.summary.FileWriter('graphs', train_graph)
-
         with train_graph.as_default():
             self._train_session = tf.Session()
             self._train_session.run(tf.global_variables_initializer())
             self._train_saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
+            self._train_writer = tf.summary.FileWriter('graphs', train_graph)
             self.restore()
 
     def build_serve_model(self):
@@ -164,32 +164,31 @@ class ApRecsys(object):
 
         serve_graph = self._model.get_serve_graph()
 
-        tf.summary.FileWriter('graphs', serve_graph)
-
         with serve_graph.as_default():
             self._serve_session = tf.Session()
             self._serve_session.run(tf.global_variables_initializer())
             self._serve_saver = tf.train.Saver(tf.global_variables(), max_to_keep=10)
+            self._serve_writer = tf.summary.FileWriter('graphs', serve_graph)
 
-    def train(self, batch_data):
+    def train(self, step, batch_data):
         """train"""
         train_graph = self._model.get_train_graph()
         loss = self._train_tensors['loss']
         backprop = self._train_tensors['backprop']
+        summary = self._train_tensors['summary']
 
         tf.summary.scalar('loss', loss)
 
         with train_graph.as_default():
-
             feed_dict = {
                 self._train_tensors['seq_item_id']: batch_data['seq_item_id'],
                 self._train_tensors['seq_len']: batch_data['seq_len'],
                 self._train_tensors['label']: batch_data['label']
             }
 
-            merged = tf.summary.merge_all()
-            _, summary, loss_value = self._train_session.run([backprop, merged, loss], feed_dict=feed_dict)
-            return loss_value
+            backprop_, summary_, loss_ = self._train_session.run([backprop, summary, loss], feed_dict=feed_dict)
+            self._train_writer.add_summary(summary_, step)
+            return loss_
 
     def save(self, step):
         with self._model.get_train_graph().as_default():
@@ -222,15 +221,16 @@ def main():
     total_iter = 0
     while True:
         batch_data = train_sampler.next_batch_debug()
-        loss = ap_model.train(batch_data)
+        loss = ap_model.train(total_iter, batch_data)
 
         acc_loss += loss
         total_iter += 1
-        print(f'[{total_iter}] acc_loss: {acc_loss}, loss: {loss}')
+        print(f'[{total_iter}] loss: {loss}')
 
         if total_iter % ap_model.eval_iter == 0:
             ap_model.save(step=total_iter)
             print('model saved')
+            print(f'[{total_iter}] avg_loss: {acc_loss / ap_model.eval_iter}')
             acc_loss = 0
 
 
