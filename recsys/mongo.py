@@ -43,7 +43,7 @@ class Mongo(object):
             return self._db
         else:
             self._pid = pid
-            print('pid: ', pid)
+
             self._client = pymongo.MongoClient(host=self._host,
                                                port=self._port,
                                                username='romi',
@@ -53,7 +53,7 @@ class Mongo(object):
 
             self._db = self._client.__getattr__(self._db_name)
 
-            print('connected mongodb')
+            print('New process connected to mongodb')
             return self._db
 
     def make_raw_data(self, batch_size=1000):

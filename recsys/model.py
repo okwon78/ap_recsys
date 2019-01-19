@@ -38,7 +38,28 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
 
         _in = _out
 
-        _item_embedding = tf.get_variable('FC_2',
+        mat = tf.get_variable('FC_2',
+                              shape=(_in.shape[1], dim_item_embed),
+                              trainable=True,
+                              initializer=tf.contrib.layers.xavier_initializer())
+
+        _bias = tf.get_variable('bias_2', shape=(dim_item_embed,), trainable=True,
+                                initializer=tf.constant_initializer(value=0.0, dtype=tf.float32))
+
+        _logits = tf.matmul(_in, mat) + _bias
+
+        _out = tf.nn.relu(_logits)
+
+        _out = tf.contrib.layers.batch_norm(_out, fused=True, decay=0.95,
+                                            center=True,
+                                            scale=True,
+                                            is_training=True,
+                                            scope="bn_2",
+                                            updates_collections=None)
+
+        _in = _out
+
+        _item_embedding = tf.get_variable('item_embedding',
                               shape=(dim_item_embed, total_items),
                               trainable=True,
                               initializer=tf.contrib.layers.xavier_initializer())

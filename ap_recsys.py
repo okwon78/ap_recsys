@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import tensorflow as tf
 import numpy as np
+from termcolor import colored
 
 from recsys.eval_manager import EvalManager
 from recsys.evaluators.auc import AUC
@@ -233,11 +234,13 @@ class ApRecsys(object):
         pos_item, input = eval_sampler.next_batch()
         while input is not None:
             scores = np.squeeze(self.serve(input, step))
-            result =  self._eval_manager.full_eval(pos_sample=pos_item, predictions=scores)
+            result, rank_above=  self._eval_manager.full_eval(pos_sample=pos_item, predictions=scores)
             completed_user_count += 1
 
             for key in result:
                 metric_results[key].append(result[key])
+
+            metric_results['rank_above']. append(rank_above)
 
             pos_item, input = eval_sampler.next_batch()
 
@@ -301,7 +304,7 @@ def main():
     ap_model.build_serve_model()
 
     ap_model.add_evaluator(Precision(precision_at=[5]))
-    ap_model.add_evaluator(Recall(recall_at=[5]))
+    ap_model.add_evaluator(Recall(recall_at=[100, 200, 300, 400, 500]))
     ap_model.add_evaluator(AUC())
 
     acc_loss = 0
@@ -328,17 +331,18 @@ def main():
         # eval
         if total_iter % ap_model.eval_iter == 0 :
             avg_loss = acc_loss / ap_model.eval_iter
-            print(f'[{total_iter}] avg_loss: {avg_loss}')
+            print(colored(f'[{total_iter}] avg_loss: {avg_loss}', 'blue'))
             summary.value.add(tag='avg_loss', simple_value=avg_loss)
             acc_loss = 0
 
             eval_results = ap_model.evaluate(eval_sampler=eval_sampler, step=total_iter)
 
             for result in eval_results:
-                print(f'[{result}] {eval_results[result]}')
+                average_result = np.mean(eval_results[result], axis=0)
+                print(colored(f'[{result}] {average_result}', 'green'))
 
-            # for name, value in eval_results:
-            #     summary.value.add(tag=name, simple_value=value)
+
+            summary.value.add(tag='rank_above', simple_value=eval_results['rank_above'])
 
         ap_model.train_writer.add_summary(summary, total_iter)
 

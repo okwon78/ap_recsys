@@ -14,7 +14,7 @@ class EvalManager(object):
         for evaluator in self._evaluators:
             results[evaluator.name] = evaluator.compute(rank_above=rank_above, negative_num=negative_num)
 
-        return results
+        return results, rank_above
 
     def _full_rank(self, pos_sample, predictions):
         rank_above = 0
