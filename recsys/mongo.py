@@ -115,6 +115,8 @@ class Mongo(object):
         try:
             doc = next(self.db.raw_data.find({'index': int(index)}))
             return doc['ordered_watch_list']
+        except StopIteration:
+            return []
         except Exception as e:
             print(e)
 

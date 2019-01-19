@@ -135,7 +135,7 @@ class Model(object):
                                            total_items=total_items,
                                            tensor_id=seq_item_id)
 
-            logits = get_mlp_softmax(name='mlp',
+            logits = get_mlp_softmax(name='mlp_softmax',
                                      tensor_seq_vec=seq_vec,
                                      tensor_label=None,
                                      tensor_seq_len=seq_len,
