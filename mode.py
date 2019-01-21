@@ -77,5 +77,6 @@ def train():
 
         ap_model.train_writer.add_summary(summary, total_iter)
 
+
 def serve():
     pass

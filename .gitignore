@@ -3,5 +3,6 @@
 /ml-20m
 /train
 /serve
+/ml-20m
 *.pyc
 *.pyo
