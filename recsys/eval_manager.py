@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class EvalManager(object):
 
     def __init__(self):
@@ -21,7 +22,7 @@ class EvalManager(object):
         pos_prediction = predictions[pos_sample]
 
         for ind in range(len(predictions)):
-                if pos_prediction < predictions[ind]:
-                    rank_above += 1
+            if pos_prediction < predictions[ind]:
+                rank_above += 1
 
         return rank_above, len(predictions)

@@ -1,5 +1,5 @@
 /.idea
-/model
+/model_save
 /ml-20m
 /train
 /serve
