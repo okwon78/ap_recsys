@@ -6,7 +6,32 @@ import pymongo
 from recsys.samplers.sampler import Sampler
 
 
-class Mongo(object):
+class MongoConfig(object):
+
+    def __init__(self, host, username, password, dbname):
+        self._host = host
+        self._username = username
+        self._password = password
+        self._dbname = dbname
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def username(self):
+        return self._username
+
+    @property
+    def password(self):
+        return self._password
+
+    @property
+    def dbname(self):
+        return self._dbname
+
+
+class MongoClient(object):
 
     def __init__(self, username, password, host, db_name, port=27017, authSource='admin',
                  authMechanism='SCRAM-SHA-256'):

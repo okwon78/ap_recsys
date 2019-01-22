@@ -4,11 +4,12 @@ import tensorflow as tf
 import numpy as np
 from termcolor import colored
 
-from recsys.ap_model import ApModel, MongoConfig
+from recsys.ap_model import ApModel
 
 from recsys.evaluators.auc import AUC
 from recsys.evaluators.precision import Precision
 from recsys.evaluators.recall import Recall
+from recsys.train.mongo_client import MongoConfig
 
 print('tensorflow version: ', tf.__version__)
 print('numpy version: ', np.__version__)
@@ -77,6 +78,3 @@ def train():
 
         ap_model.train_writer.add_summary(summary, total_iter)
 
-
-def serve():
-    pass

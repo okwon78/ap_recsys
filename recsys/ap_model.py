@@ -6,44 +6,19 @@ import tensorflow as tf
 from collections import defaultdict
 
 from recsys.model import Model
-from recsys.mongo import Mongo
-from recsys.eval_manager import EvalManager
+from recsys.train.mongo_client import MongoClient
+from recsys.train.eval_manager import EvalManager
 from recsys.samplers.sampler import Sampler
-
-
-class MongoConfig(object):
-
-    def __init__(self, host, username, password, dbname):
-        self._host = host
-        self._username = username
-        self._password = password
-        self._dbname = dbname
-
-    @property
-    def host(self):
-        return self._host
-
-    @property
-    def username(self):
-        return self._username
-
-    @property
-    def password(self):
-        return self._password
-
-    @property
-    def dbname(self):
-        return self._dbname
 
 
 class ApModel(object):
 
     def __init__(self, model_dir, mongoConfig):
 
-        self._mongo = Mongo(host=mongoConfig.host,
-                            username=mongoConfig.username,
-                            password=mongoConfig.password,
-                            db_name=mongoConfig.dbname)
+        self._mongo = MongoClient(host=mongoConfig.host,
+                                  username=mongoConfig.username,
+                                  password=mongoConfig.password,
+                                  db_name=mongoConfig.dbname)
 
         self._embedding_size = 20
         self._dim_item_embed = 50
