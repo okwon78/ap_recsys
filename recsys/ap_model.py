@@ -110,6 +110,12 @@ class ApModel(object):
     def make_movie_index(self):
         self._mongo.make_movie_index()
 
+    def get_movieId_from_index(self, index):
+        return self._mongo.get_movieId_from_index(index)
+
+    def get_movie_info(self, movieId):
+        return self._mongo.get_movie_info(movieId)
+
     def _train_batch(self):
 
         low_pos = int(self._mongo.total_raw_data * self._train_percentage)
@@ -226,7 +232,7 @@ class ApModel(object):
             self._train_writer.add_summary(summary_, step)
             return loss_
 
-    def serve(self, input, step=None):
+    def serve(self, input):
 
         if self._flag_updated:
             self._save_and_load_for_serve()
@@ -249,7 +255,7 @@ class ApModel(object):
         completed_user_count = 0
         pos_item, input = eval_sampler.next_batch()
         while input is not None:
-            scores = np.squeeze(self.serve(input, step))
+            scores = np.squeeze(self.serve(input))
             result, rank_above = self._eval_manager.full_eval(pos_sample=pos_item, predictions=scores)
             completed_user_count += 1
 

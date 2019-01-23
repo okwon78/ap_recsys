@@ -78,3 +78,6 @@ def train():
 
         ap_model.train_writer.add_summary(summary, total_iter)
 
+
+if __name__ is '__main__':
+    train()

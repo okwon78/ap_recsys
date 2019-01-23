@@ -57,39 +57,48 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
                                             scope="bn_2",
                                             updates_collections=None)
 
-        _in = _out
+        _user_embedding = _out
 
-        _item_embedding = tf.get_variable('item_embedding',
+        _out = tf.get_variable('item_embedding',
                               shape=(dim_item_embed, total_items),
                               trainable=True,
                               initializer=tf.contrib.layers.xavier_initializer())
 
-        _logits = tf.matmul(_in, _item_embedding)
+        _logits = tf.matmul(_user_embedding, _out)
 
-        return _logits, _item_embedding
+        _item_embedding = tf.transpose(_out)
+
+        return _logits, _item_embedding, _user_embedding
 
 
 def get_mlp_softmax(name, tensor_seq_vec, tensor_label, tensor_seq_len, max_seq_len, dim_item_embed,
                     total_items, train):
     with tf.variable_scope(name_or_scope=name, reuse=tf.AUTO_REUSE):
+        tensors = dict()
+
         # average item vectors user interacted with
         seq_mask = tf.sequence_mask(tensor_seq_len, max_seq_len, dtype=tf.float32)
         item = tf.reduce_mean(tensor_seq_vec * tf.expand_dims(seq_mask, axis=2), axis=1)
 
         in_tensor = tf.concat(values=[item], axis=1)
 
-        _logits, _item_embedding = get_MultiLayerFC(name='mlp',
+        _logits, _item_embedding, _user_embedding = get_MultiLayerFC(name='mlp',
                                                     dim_item_embed=dim_item_embed,
                                                     total_items=total_items,
                                                     tensor_in_tensor=in_tensor)
 
         tf.summary.histogram('logits', _logits)
 
+        tensors['logits'] = _logits
+
         if train:
-            _loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tensor_label, logits=_logits)
-            return _loss
+            _losses = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tensor_label, logits=_logits)
+            tensors['losses'] = _losses
         else:
-            return _logits
+            tensors['_item_embedding'] = _item_embedding
+            tensors['_user_embedding'] = _user_embedding
+
+        return tensors
 
 
 class Model(object):
@@ -106,31 +115,30 @@ class Model(object):
             seq_len = tf.placeholder(tf.int32, shape=(batch_size,), name='seq_len')
             label = tf.placeholder(tf.int32, shape=(batch_size,), name='label')
 
-            tensors = dict()
-            tensors['seq_item_id'] = seq_item_id
-            tensors['seq_len'] = seq_len
-            tensors['label'] = label
-
             _, seq_vec = get_latent_factor(name='latent_factor',
                                            embedding_size=embedding_size,
                                            total_items=total_items,
                                            tensor_id=seq_item_id)
 
-            losses = get_mlp_softmax(name='mlp_softmax',
-                                     tensor_seq_vec=seq_vec,
-                                     tensor_label=label,
-                                     tensor_seq_len=seq_len,
-                                     max_seq_len=max_seq_len,
-                                     dim_item_embed=dim_item_embed,
-                                     total_items=total_items,
-                                     train=True)
+            tensors = get_mlp_softmax(name='mlp_softmax',
+                                       tensor_seq_vec=seq_vec,
+                                       tensor_label=label,
+                                       tensor_seq_len=seq_len,
+                                       max_seq_len=max_seq_len,
+                                       dim_item_embed=dim_item_embed,
+                                       total_items=total_items,
+                                       train=True)
 
-            loss_mean = tf.reduce_mean(losses)
+            tensors['seq_item_id'] = seq_item_id
+            tensors['seq_len'] = seq_len
+            tensors['label'] = label
+
+            loss_mean = tf.reduce_mean(tensors['losses'])
 
             optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
             backprop = optimizer.minimize(loss_mean)
 
-            tf.summary.histogram('losses', losses)
+            tf.summary.histogram('losses', tensors['losses'])
             tf.summary.scalar('loss_mean', loss_mean)
             summary = tf.summary.merge_all()
 
@@ -147,25 +155,25 @@ class Model(object):
             seq_item_id = tf.placeholder(tf.int32, shape=(None, max_seq_len), name='seq_item_id')
             seq_len = tf.placeholder(tf.int32, shape=(None,), name='seq_len')
 
-            tensors = dict()
-            tensors['seq_item_id'] = seq_item_id
-            tensors['seq_len'] = seq_len
+
+
 
             _, seq_vec = get_latent_factor(name='latent_factor',
                                            embedding_size=embedding_size,
                                            total_items=total_items,
                                            tensor_id=seq_item_id)
 
-            logits = get_mlp_softmax(name='mlp_softmax',
-                                     tensor_seq_vec=seq_vec,
-                                     tensor_label=None,
-                                     tensor_seq_len=seq_len,
-                                     max_seq_len=max_seq_len,
-                                     dim_item_embed=dim_item_embed,
-                                     total_items=total_items,
-                                     train=False)
+            tensors = get_mlp_softmax(name='mlp_softmax',
+                                       tensor_seq_vec=seq_vec,
+                                       tensor_label=None,
+                                       tensor_seq_len=seq_len,
+                                       max_seq_len=max_seq_len,
+                                       dim_item_embed=dim_item_embed,
+                                       total_items=total_items,
+                                       train=False)
 
-            tensors['logits'] = logits
+            tensors['seq_item_id'] = seq_item_id
+            tensors['seq_len'] = seq_len
 
             return tensors
 

@@ -1,11 +1,14 @@
+import os
+import numpy as np
 from flask import Flask, jsonify, request
 
-from demo_mongo_client import DemoMongoClient
+from recsys.ap_model import ApModel
+from recsys.serve.redis_client import RedisConnectionConfig, RedisClient
+from recsys.train.mongo_client import MongoConfig
 
 
-def get_api_server():
+def get_api_server(ap_model, redis_client, top_k):
     app = Flask(__name__)
-    client = DemoMongoClient(host='13.209.6.203', db_name='recsys')
 
     version = 'v1.0'
 
@@ -19,17 +22,33 @@ def get_api_server():
     def home():
         return jsonify({'server info': info})
 
-    @app.route('/recsys/api/test/db', methods=['GET'])
+    @app.route('/recsys/api/', methods=['POST'])
     def get_personal_recommendation():
         content = request.json
         userId = content['userId']
+        key = f'userId:{userId}'
+        input_seq = redis_client[key]
+        input_seq = [int(movieId) for movieId in input_seq]
+        input = np.zeros(1, dtype=[('seq_item_id', (np.int32, ap_model.max_seq_len)), ('seq_len', np.int32)])
+        input[0] = (input_seq, len(input_seq))
+        logit = np.squeeze(ap_model.serve(input), axis=1)
+        movie_index = np.argsort(logit)[::-1][:top_k]
 
-        watch_history = client.get_watch_history(userId)
+        movieIds = []
+        for index in movie_index:
+            movieIds.append(ap_model.get_movieId_from_index(index))
+
+        input_movies_info = ap_model.get_movie_info(input_seq)
+        recommendation_movies_info = ap_model.get_movie_info(movieIds)
 
         response = {
             'userId': userId,
-            'watch_history': info
+            'input_movies_info': input_movies_info,
+            'recommendation_movies_info': recommendation_movies_info
         }
+
+        print('i: ', response['input_movies_info'])
+        print('r: ', response['recommendation_movies_info'])
 
         return jsonify(response)
 
@@ -37,5 +56,25 @@ def get_api_server():
 
 
 def serve():
-    api_server = get_api_server()
+    mongo_config = MongoConfig(host='13.209.6.203',
+                               username='romi',
+                               password="Amore12345!",
+                               dbname='recsys')
+
+    model_save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_save')
+
+    ap_model = ApModel(model_save_path, mongo_config)
+    ap_model.build_serve_model()
+    ap_model.restore(restore_serve=True)
+    ap_model.make_movie_index()
+
+    redis_config = RedisConnectionConfig()
+    redis_client = RedisClient(redis_connection_config=redis_config, expire_time_seconds=None)
+
+    # WAS
+    api_server = get_api_server(ap_model, redis_client, top_k=10)
     api_server.run(debug=True)
+
+
+if __name__ is '__main__':
+    serve()

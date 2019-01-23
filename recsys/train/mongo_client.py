@@ -133,6 +133,22 @@ class MongoClient(object):
             self._movies_to_index[doc['movieId']] = doc['index']
             self._index_to_movies[doc['index']] = doc['movieId']
 
+    def get_movie_info(self, movieIds):
+
+        projection = {
+            '_id': 0,
+            'movieId': 1,
+            'title': 1,
+            'url': 1
+        }
+        movie_infos = []
+
+        for doc in self.db.movies.find({'movieId': {'$in': movieIds}}, projection):
+            movie_infos.append(doc)
+
+        return movie_infos
+
+
     def get_watch_list(self, index):
         if self._total_raw_data == 0:
             return None

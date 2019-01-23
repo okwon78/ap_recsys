@@ -41,6 +41,9 @@ class RedisClient(object):
         self._set_expire(key)
 
     def _sustain_seq_len(self, key, current_len):
+        if self._max_seq_len is None:
+            return
+
         difference = current_len - self._max_seq_len
         if difference > 0:
             self._redis_db.ltrim(key, 0, self._max_seq_len - 1)
