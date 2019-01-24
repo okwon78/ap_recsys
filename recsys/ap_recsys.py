@@ -5,13 +5,13 @@ import numpy as np
 import tensorflow as tf
 from collections import defaultdict
 
-from recsys.model import Model
+from recsys.rec_model_impl import RecModel
 from recsys.train.mongo_client import MongoClient
 from recsys.train.eval_manager import EvalManager
 from recsys.samplers.sampler import Sampler
 
 
-class ApModel(object):
+class ApRecsys(object):
 
     def __init__(self, model_dir, mongoConfig):
 
@@ -20,14 +20,14 @@ class ApModel(object):
                                   password=mongoConfig.password,
                                   db_name=mongoConfig.dbname)
 
-        self._embedding_size = 20
-        self._dim_item_embed = 50
-        self._max_seq_len = 5
+        self._embedding_size = 100
+        self._dim_item_embed = 100
+        self._max_seq_len = 10
         self._batch_size = 100
         self._eval_iter = 10
         self._train_percentage = 0.9
 
-        self._model = Model()
+        self._model = RecModel()
 
         self._train_tensors = None
         self._serve_tensors = None
@@ -113,6 +113,9 @@ class ApModel(object):
     def get_movieId_from_index(self, index):
         return self._mongo.get_movieId_from_index(index)
 
+    def get_index_from_movieId(self, movieId):
+        return self._mongo.get_index_from_movieId(movieId)
+
     def get_movie_info(self, movieId):
         return self._mongo.get_movie_info(movieId)
 
@@ -129,6 +132,10 @@ class ApModel(object):
             while True:
                 index = np.random.randint(low=low_pos, high=self._mongo.total_raw_data - 1)
                 watch_history = self._mongo.get_watch_list(index)
+
+                if watch_history is None:
+                    continue
+
                 if len(watch_history) > 0:
                     watch_histories_sample.append(watch_history)
 
@@ -240,13 +247,18 @@ class ApModel(object):
 
         with self._model.get_serve_graph().as_default():
             logits = self._serve_tensors['logits']
+            user_embedding = self._serve_tensors['user_embedding']
 
             feed_dict = {
                 self._serve_tensors['seq_item_id']: input['seq_item_id'],
                 self._serve_tensors['seq_len']: input['seq_len']
             }
 
-            logits_ = self._serve_session.run([logits], feed_dict=feed_dict)
+            debug_opt = self._serve_tensors['debug']
+
+            debug_out_, user_embedding_, logits_ = self._serve_session.run([debug_opt, user_embedding, logits], feed_dict=feed_dict)
+            # print('seq_item_id: ', input['seq_item_id'])
+            # print('debug: ', debug_out_[:10])
             return logits_
 
     def evaluate(self, eval_sampler, step):
@@ -278,12 +290,12 @@ class ApModel(object):
 
         if restore_train:
             with self._model.get_train_graph().as_default():
-                self.restore_only_variable(self._train_session, self._save_model_path)
+                self._restore_only_variable(self._train_session, self._save_model_path)
         if restore_serve:
             with self._model.get_serve_graph().as_default():
-                self.restore_only_variable(self._serve_session, self._save_model_path)
+                self._restore_only_variable(self._serve_session, self._save_model_path)
 
-    def restore_only_variable(self, session, save_model_path):
+    def _restore_only_variable(self, session, save_model_path):
 
         reader = tf.train.NewCheckpointReader(save_model_path)
         saved_shapes = reader.get_variable_to_shape_map()

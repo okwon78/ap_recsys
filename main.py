@@ -1,5 +1,5 @@
-from serve_mode import serve
-from train_mode import train
+from serve import serve
+from train import train
 
 
 def main():
