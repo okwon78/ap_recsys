@@ -136,7 +136,6 @@ class RecModel(object):
             backprop = optimizer.minimize(loss_mean)
 
             tf.summary.histogram('losses', tensors['losses'])
-            tf.summary.scalar('loss_mean', loss_mean)
             summary = tf.summary.merge_all()
 
             tensors['loss'] = loss_mean

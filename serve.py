@@ -83,7 +83,7 @@ def serve():
 
     # WAS
     api_server = get_api_server(ap_model, redis_client, top_k=20)
-    api_server.run(debug=True)
+    api_server.run(host='0.0.0.0')
 
 
 if __name__ is '__main__':
