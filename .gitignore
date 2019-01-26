@@ -1,3 +1,4 @@
+/__pycache__
 /.idea
 /model_save
 /ml-20m
@@ -6,3 +7,5 @@
 /ml-20m
 *.pyc
 *.pyo
+nohup.out
+
