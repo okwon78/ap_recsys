@@ -79,11 +79,13 @@ def serve():
     ap_model.make_movie_index()
 
     redis_config = RedisConnectionConfig()
-    redis_client = RedisClient(redis_connection_config=redis_config, expire_time_seconds=None)
+    redis_client = RedisClient(redis_connection_config=redis_config,
+                               max_seq_len=ap_model.max_seq_len,
+                               expire_time_seconds=None)
 
     # WAS
     api_server = get_api_server(ap_model, redis_client, top_k=20)
-    api_server.run(host='0.0.0.0')
+    api_server.run(host='0.0.0.0', debug=True)
 
 
 if __name__ is '__main__':
