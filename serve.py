@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from recsys.ap_recsys import ApRecsys
 from recsys.serve.redis_client import RedisConnectionConfig, RedisClient
@@ -8,7 +8,7 @@ from recsys.train.mongo_client import MongoConfig
 
 
 def get_api_server(ap_model, redis_client, top_k):
-    app = Flask(__name__)
+    app = Flask(__name__, static_url_path='/static')
 
     version = 'v1.0'
 
@@ -17,10 +17,17 @@ def get_api_server(ap_model, redis_client, top_k):
         'version': version
     }
 
-    @app.route("/")
-    @app.route("/home")
-    def home():
+    @app.route("/info")
+    def info():
         return jsonify({'server info': info})
+
+    @app.route('/')
+    def root():
+        return app.send_static_file('index.html')
+
+    @app.route('/static/<path:path>')
+    def send_static(path):
+        return send_from_directory('static', path)
 
     @app.route('/recsys/api/', methods=['POST'])
     def get_personal_recommendation():

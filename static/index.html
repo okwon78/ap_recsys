@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <base href="/">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <meta name="description" content="CoreUI - Open Source Bootstrap Admin Template">
+    <meta name="author" content="Łukasz Holeczek">
+    <meta name="keyword" content="Bootstrap,Admin,Template,Open,Source,jQuery,CSS,HTML,RWD,Dashboard">
+    <title>Recommend Demo</title>
+    <!-- Main styles for this application-->
+    <link href="/static/css/style.css" rel="stylesheet">
+	<style>
+	  .container {
+        position: relative;
+        width: 100%;
+        height: 0;
+        padding-bottom: 56.25%;
+      }
+      .video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+	</style>
+  </head>
+  <body class="app header-fixed sidebar-fixed aside-menu-fixed sidebar-lg-show">
+    <header class="app-header navbar">
+      <button class="navbar-toggler sidebar-toggler d-lg-none mr-auto" type="button" data-toggle="sidebar-show">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <!-- 상단 로고 -->
+	  <a class="navbar-brand" href="index.html">
+        <img class="navbar-brand-full" src="/static/img/logo.jpg" width="89" height="25" alt="Logo">        
+      </a>
+      
+	  <!-- 상단 대메뉴바 시작 -->
+      <ul class="nav navbar-nav d-md-down-none">
+        <li class="nav-item px-3">
+          <a class="nav-link" href="#">추천 시스템</a>
+        </li>
+		<!--
+        <li class="nav-item px-3">
+          <a class="nav-link" href="#">상단 추가할 대메뉴</a>
+        </li>
+		-->
+      </ul>
+	  <!-- 상단 대메뉴바 종료 -->
+      <ul class="nav navbar-nav ml-auto">
+      </ul>
+    </header>
+    <div class="app-body">
+      <div class="sidebar">
+        <nav class="sidebar-nav">
+          <ul class="nav">
+            <li class="nav-title">추천 시스템</li>
+            <li class="nav-item">
+              <a class="nav-link" href="">
+                <i class="nav-icon icon-drop"></i> 컨텐츠 추천</a>
+            </li>
+			<!--
+            <li class="nav-item">
+              <a class="nav-link" href="">
+                <i class="nav-icon icon-pencil"></i> 추가 메뉴</a>
+            </li>
+			-->
+          </ul>
+        </nav>
+        <button class="sidebar-minimizer brand-minimizer" type="button"></button>
+      </div>
+      <main class="main">
+	    <!-- 사이트맵 시작 -->
+	    <ol class="breadcrumb">
+          <li class="breadcrumb-item">Home</li>
+          <li class="breadcrumb-item active">추천 시스템</li>
+        </ol>
+		<!-- 사이트맵 종료 -->
+		<!-- 컨텐츠 시작 -->
+		<div class="container-fluid">
+          <div class="animated fadeIn">
+		    <!-- 검색 영역 시작 -->
+			<div class="row">
+			  <div class="col-lg-12">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="col-form-label" for="appendedInputButton"></label>
+                      <div class="controls">
+                        <div class="input-group">
+						  <span class="input-group-prepend">
+                            <button class="btn btn-primary">userId</button>
+                          </span>
+						  <input class="form-control" size="16" type="text" placeholder="userId" id="user_id">
+                          <span class="input-group-append">
+                            <button class="btn btn-primary" type="button" id="send">Search</button>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+			</div>
+			<!-- 검색 영역 완료 -->
+			<!-- 결과 시작 -->
+			<div style="display: none;" id="result_area">
+			  <div class="row">
+			    <div class="col-lg-12">
+                  <h1 class="h2">시청 컨텐츠</h1>
+                </div>
+			  </div>
+			  <div class="row" id="input_movie_area">
+				  
+              </div>
+			  <hr />
+			  <div class="row">
+			    <div class="col-lg-12">
+                  <h1 class="h2">추천 컨텐츠</h1>
+                </div>
+			  </div>
+			  <div class="row" id="rec_movie_area">
+				  
+              </div>
+			</div>
+			<!-- 결과 종료 -->
+          </div>
+        </div>
+		<!-- 컨텐츠 종료 -->
+		<!-- Modal -->
+		<div class="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+		  <div class="modal-dialog" role="document">
+			<div class="modal-content" style="width: 900px; height: 500px;">
+			  <div class="modal-body container">
+                
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <footer class="app-footer">
+      <div>
+        <a href="mailto:obkwon@amorepacific.com">Recommend System</a>
+        <span>&copy; 2019 obkwon</span>
+      </div>
+    </footer>
+    <script src="static/js/jquery-3.3.1.min.js"></script>
+	<script src="static/js/bootstrap.min.js"></script>
+	<script src="static/app/main.js"></script>
+  </body>
+</html>
