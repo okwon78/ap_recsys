@@ -32,6 +32,7 @@ def train():
     eval_sampler = ap_recsys.get_eval_sampler()
 
     ap_recsys.build_train_model()
+
     ap_recsys.build_serve_model()
 
     ap_recsys.add_evaluator(Precision(precision_at=[100]))

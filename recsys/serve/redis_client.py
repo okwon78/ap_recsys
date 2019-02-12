@@ -58,3 +58,13 @@ class RedisClient(object):
 
     def flushall(self):
         self._redis_db.flushall()
+
+
+def test():
+    config = RedisConnectionConfig()
+    client = RedisClient(redis_connection_config=config, expire_time_seconds=None)
+    print(client['userId:1'])
+
+if __name__ == '__main__':
+    test()
+

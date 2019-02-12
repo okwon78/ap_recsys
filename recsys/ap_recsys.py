@@ -105,7 +105,8 @@ class ApRecsys(object):
         return self._train_writer
 
     def make_raw_data(self):
-        self._mongo.make_raw_data()
+        pass
+        # self._mongo.make_raw_data()
 
     def make_movie_index(self):
         self._mongo.make_movie_index()

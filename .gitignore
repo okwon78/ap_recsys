@@ -7,5 +7,7 @@
 /ml-20m
 *.pyc
 *.pyo
+*.npy
+*.csv
 nohup.out
 
