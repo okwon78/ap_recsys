@@ -76,5 +76,5 @@ def train():
         ap_recsys.train_writer.add_summary(summary, total_iter)
 
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     train()
