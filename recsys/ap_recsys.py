@@ -24,8 +24,8 @@ class ApRecsys(object):
         self._dim_item_embed = 100
         self._max_seq_len = 10
         self._batch_size = 100
-        self._eval_iter = 10
-        self._train_percentage = 0.9
+        self._eval_iter = 1000
+        self._eval_percentage = 0.1
 
         self._model = RecModel()
 
@@ -40,8 +40,8 @@ class ApRecsys(object):
         self._serve_writer = None
 
         self._eval_manager = EvalManager()
-        self._eval_watch_histories_sample = dict()
-        self._min_eval_item_count = 10
+        self._eval_histories_sample = dict()
+        self._min_eval_item_count = 100
         self._flag_updated = False
 
         self._save_model_dir = model_dir
@@ -56,6 +56,8 @@ class ApRecsys(object):
 
         if os.path.exists(self._serve_summary_path):
             shutil.rmtree(self._serve_summary_path)
+
+        self.load_item_index()
 
     @property
     def batch_size(self):
@@ -104,80 +106,78 @@ class ApRecsys(object):
 
         return self._train_writer
 
-    def make_raw_data(self):
-        pass
-        # self._mongo.make_raw_data()
+    def load_item_index(self):
+        self._mongo.load_item_index()
 
-    def make_movie_index(self):
-        self._mongo.make_movie_index()
+    def get_itemId(self, index):
+        return self._mongo.get_itemId(index)
 
-    def get_movieId_from_index(self, index):
-        return self._mongo.get_movieId_from_index(index)
-
-    def get_index_from_movieId(self, movieId):
-        return self._mongo.get_index_from_movieId(movieId)
+    def get_index(self, itemId):
+        return self._mongo.get_index(itemId)
 
     def get_movie_info(self, movieId):
-        return self._mongo.get_movie_info(movieId)
+        return self._mongo.get_item_info(movieId)
 
     def _train_batch(self):
 
-        low_pos = int(self._mongo.total_raw_data * self._train_percentage)
+        low_pos = int(self._mongo.total_users * self._eval_percentage)
+
         while True:
             input_npy = np.zeros(self._batch_size,
                                  dtype=[('seq_item_id', (np.int32, self.max_seq_len)),
                                         ('seq_len', np.int32),
                                         ('label', np.int32)])
 
-            watch_histories_sample = list()
+            histories_sample = list()
             while True:
-                index = np.random.randint(low=low_pos, high=self._mongo.total_raw_data - 1)
-                watch_history = self._mongo.get_watch_list(index)
+                index = np.random.randint(low=low_pos, high=self._mongo.total_users - 1)
+                history = self._mongo.get_item_list(index)
 
-                if watch_history is None:
+                if history is None:
                     continue
 
-                if len(watch_history) > 0:
-                    watch_histories_sample.append(watch_history)
+                if len(history) > 1:
+                    histories_sample.append(history)
 
-                if len(watch_histories_sample) == self._batch_size:
+                if len(histories_sample) == self._batch_size:
                     break
 
-            for ind, watch_history in enumerate(watch_histories_sample):
-                predict_pos = np.random.randint(low=1, high=len(watch_history))
-                train_items = watch_history[max(0, predict_pos - self._max_seq_len): predict_pos]
-                train_items = [self._mongo.get_index_from_movieId(movieId) for movieId in train_items]
+            for ind, history in enumerate(histories_sample):
+                predict_pos = np.random.randint(low=1, high=len(history))
+                train_items = history[max(0, predict_pos - self._max_seq_len): predict_pos]
+                train_items = [self._mongo.get_index(itemId) for itemId in train_items]
 
                 pad_train_items = np.zeros(self.max_seq_len, np.int32)
                 pad_train_items[:len(train_items)] = train_items
-                predict_index = self._mongo.get_index_from_movieId(watch_history[predict_pos])
+                predict_index = self._mongo.get_index(history[predict_pos])
                 input_npy[ind] = (pad_train_items, len(train_items), predict_index)
 
             yield input_npy
 
     def _eval_batch(self):
 
-        if len(self._eval_watch_histories_sample) == 0:
-            low_pos = min(self._min_eval_item_count, int(self._mongo.total_raw_data * self._train_percentage))
+        if len(self._eval_histories_sample) == 0:
+            low_pos = max(self._min_eval_item_count, int(self._mongo.total_users * self._eval_percentage))
+
             index_list = np.arange(start=0, stop=low_pos, step=1)
             for ind in index_list:
-                watch_history = self._mongo.get_watch_list(ind)
-                if len(watch_history) > 1:
-                    index_watch_history = [self._mongo.get_index_from_movieId(movieId) for movieId in watch_history]
-                    self._eval_watch_histories_sample[ind] = index_watch_history
+                history = self._mongo.get_item_list(ind)
+                if len(history) > 1:
+                    history = [self._mongo.get_index(itemId) for itemId in history]
+                    self._eval_histories_sample[ind] = history
 
         predict_pos = -1  # last position
 
         while True:
-            for index_watch_history in self._eval_watch_histories_sample.values():
+            for history in self._eval_histories_sample.values():
                 input_npy = np.zeros(1, dtype=[('seq_item_id', (np.int32, self.max_seq_len)),
                                                ('seq_len', np.int32)])
 
-                train_items = index_watch_history[-self.max_seq_len - 1:predict_pos]
-                pad_train_items = np.zeros(self.max_seq_len, np.int32)
-                pad_train_items[:len(train_items)] = train_items
-                input_npy[0] = (pad_train_items, len(train_items))
-                yield index_watch_history[predict_pos], input_npy
+                input_items = history[-self.max_seq_len - 1:predict_pos]
+                pad_input_items = np.zeros(self.max_seq_len, np.int32)
+                pad_input_items[:len(input_items)] = input_items
+                input_npy[0] = (pad_input_items, len(input_items))
+                yield history[predict_pos], input_npy
             yield None, None
 
     def get_train_sampler(self):
@@ -185,7 +185,6 @@ class ApRecsys(object):
 
     def get_eval_sampler(self):
         s = Sampler(generate_batch=self._eval_batch, num_process=1)
-        s._reset()
         return s
 
     def build_train_model(self):
@@ -193,7 +192,7 @@ class ApRecsys(object):
         self._train_tensors = self._model.build_train_model(batch_size=self._batch_size,
                                                             embedding_size=self._embedding_size,
                                                             dim_item_embed=self.dim_item_embed,
-                                                            total_items=self._mongo.total_movies,
+                                                            total_items=self._mongo.total_items,
                                                             max_seq_len=self.max_seq_len)
 
         with self._model.get_train_graph().as_default():
@@ -208,7 +207,7 @@ class ApRecsys(object):
 
         self._serve_tensors = self._model.build_serve_model(embedding_size=self._embedding_size,
                                                             dim_item_embed=self.dim_item_embed,
-                                                            total_items=self._mongo.total_movies,
+                                                            total_items=self._mongo.total_items,
                                                             max_seq_len=self.max_seq_len)
 
         with self._model.get_serve_graph().as_default():
@@ -279,7 +278,7 @@ class ApRecsys(object):
 
             pos_item, input = eval_sampler.next_batch()
 
-        return metric_results
+         return metric_results
 
     def save(self):
         with self._model.get_train_graph().as_default():

@@ -19,19 +19,16 @@ def train():
     mongo_config = MongoConfig(host='13.209.6.203',
                                username='romi',
                                password="Amore12345!",
-                               dbname='recsys')
+                               dbname='recsys_apmall')
 
     model_save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_save')
 
     ap_recsys = ApRecsys(model_save_path, mongo_config)
 
-    ap_recsys.make_movie_index()
-
     train_sampler = ap_recsys.get_train_sampler()
     eval_sampler = ap_recsys.get_eval_sampler()
 
     ap_recsys.build_train_model()
-
     ap_recsys.build_serve_model()
 
     ap_recsys.add_evaluator(Precision(precision_at=[100]))

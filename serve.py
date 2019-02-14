@@ -55,8 +55,8 @@ def get_api_server(ap_model, redis_client, top_k):
         # print(logit[:10])
         # print(logit[movie_index])
         # print(movieIds)
-        input_movies_info = ap_model.get_movie_info(input_seq)
-        recommendation_movies_info = ap_model.get_movie_info(movieIds)
+        input_movies_info = ap_model.get_item_info(input_seq)
+        recommendation_movies_info = ap_model.get_item_info(movieIds)
 
         response = {
             'userId': userId,

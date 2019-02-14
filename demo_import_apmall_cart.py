@@ -40,10 +40,10 @@ def draw_hist(items, step=1000):
 
 
 def add_cart_data_from_csv(recsys_db):
-    recsys_db.records.delete_many({})
+    recsys_db.users.delete_many({})
     recsys_db.items.delete_many({})
 
-    records = dict()
+    users = dict()
     items = dict()
 
     with open('./apmall_cart_hist_nm.csv', 'r') as f:
@@ -59,15 +59,15 @@ def add_cart_data_from_csv(recsys_db):
                 buy_flag = True if cols[5].strip() == 'Y' else False
                 itemName = cols[6].strip()
 
-                if not comcsno in records:
-                    record = {
+                if not comcsno in users:
+                    user = {
                         'userId': comcsno,
                         'itemIds': []
                     }
 
-                    records[comcsno] = record
+                    users[comcsno] = user
 
-                records[comcsno]['itemIds'].append({
+                users[comcsno]['itemIds'].append({
                     'itemId': itemId,
                     'purchased': buy_flag,
                     'timestamp': insert_time
@@ -78,6 +78,7 @@ def add_cart_data_from_csv(recsys_db):
                         'itemId': itemId,
                         'sap_code': sap_code,
                         'itemName': itemName,
+                        'url': "",
                         'count': 0
                     }
 
@@ -90,34 +91,42 @@ def add_cart_data_from_csv(recsys_db):
                 return
 
     user_idx = 0
-    for record in records.values():
+    users_to_delete = []
+    for user in users.values():
 
-        if len(record['itemIds']) < 2:
+        if len(user['itemIds']) < 2:
+            users_to_delete.append(user['userId'])
             continue
 
-        record['itemIds'].sort(key=lambda elem: int(elem['timestamp']))
-        record['sorted_items'] = [elem['itemId'] for elem in record['itemIds']]
-        record['user_index'] = user_idx
+        user['itemIds'].sort(key=lambda elem: int(elem['timestamp']))
+        user['sorted_items'] = [elem['itemId'] for elem in user['itemIds']]
+        user['user_index'] = user_idx
         user_idx += 1
 
-    records = list(records.values())
+    for userId in users_to_delete:
+        users.pop(userId)
+
+    users = list(users.values())
     items = list(items.values())
 
-    save('records', records)
+    for idx, item in enumerate(items):
+        item['item_index'] = idx
+
+    save('records', users)
     save('items', items)
 
-    recsys_db.records.insert_many(records)
+    recsys_db.users.insert_many(users)
     recsys_db.items.insert_many(items)
 
 
 def add_cart_data_from_file(recsys_db):
-    recsys_db.records.delete_many({})
+    recsys_db.users.delete_many({})
     recsys_db.items.delete_many({})
 
     records = load('records.npy')
     items = load('items.npy')
 
-    recsys_db.records.insert_many(list(records))
+    recsys_db.users.insert_many(list(records))
     recsys_db.items.insert_many(items)
 
     draw_hist(items)

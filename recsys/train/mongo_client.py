@@ -50,14 +50,14 @@ class MongoClient(object):
 
         self._db_name = db_name
         self._db = self._client.__getattr__(db_name)
-        self._total_movies = self._db.movies.count()
-        self._movies_to_index = dict()
-        self._index_to_movies = dict()
-        self._total_users = self._db.ratings.count()
-        self._total_raw_data = self._db.raw_data.count()
+        self._total_items = self._db.items.count()
+        self._total_users = self._db.users.count()
 
-        if self._total_movies < 0 or self._total_users < 0:
+        if self._total_items < 0 or self._total_users < 0:
             raise ValueError("Invalid database")
+
+        self._itemId_to_index = dict()
+        self._index_to_itemId = dict()
 
     @property
     def db(self):
@@ -81,100 +81,54 @@ class MongoClient(object):
             print('New process connected to mongodb')
             return self._db
 
-    def make_raw_data(self, batch_size=1000):
-        ratings = self.db.ratings
-
-        start = 0
-        end = ratings.count()
-        current = start
-
+    def load_item_index(self):
         projection = {
             '_id': 0,
-            'userId': 1,
-            'movie_pos': 1
+            'item_index': 1,
+            'itemId': 1
         }
 
-        self.db.raw_data.delete_many({})
+        for doc in self.db.items.find({}, projection):
+            self._itemId_to_index[doc['itemId']] = doc['item_index']
+            self._index_to_itemId[doc['item_index']] = doc['itemId']
 
-        index_list = list(range(end))
-        random.shuffle(index_list)
-
-        index = 0
-        while current < end:
-            raw_data = []
-            for doc in ratings.find({}, projection).skip(current).limit(batch_size):
-
-                if len(doc['movie_pos']) < 2:
-                    continue
-
-                doc['movie_pos'].sort(key=lambda item: int(item['timestamp']))
-                ordered_watch_list = [item['movieId'] for item in doc['movie_pos']]
-
-                input = {
-                    'index': int(index_list[index]),
-                    'ordered_watch_list': ordered_watch_list,
-                }
-
-                index += 1
-                raw_data.append(input)
-            current += batch_size
-            self.db.raw_data.insert_many(raw_data)
-
-        self._total_raw_data = self.db.raw_data.count()
-
-    def make_movie_index(self):
-        projection = {
-            '_id': 0,
-            'index': 1,
-            'movieId': 1
-        }
-
-        for doc in self.db.movies.find({}, projection):
-            self._movies_to_index[doc['movieId']] = doc['index']
-            self._index_to_movies[doc['index']] = doc['movieId']
-
-    def get_movie_info(self, movieIds):
+    def get_item_info(self, itemIds):
 
         projection = {
             '_id': 0,
-            'movieId': 1,
-            'title': 1,
+            'itemId': 1,
+            'itemName': 1,
             'url': 1
         }
-        movie_infos = []
 
-        for doc in self.db.movies.find({'movieId': {'$in': movieIds}}, projection):
-            movie_infos.append(doc)
+        item_infos = []
 
-        return movie_infos
+        for doc in self.db.items.find({'itemId': {'$in': itemIds}}, projection):
+            item_infos.append(doc)
+
+        return item_infos
 
 
-    def get_watch_list(self, index):
-        if self._total_raw_data == 0:
-            return None
+    def get_item_list(self, user_index):
 
         try:
-            doc = next(self.db.raw_data.find({'index': int(index)}))
-            return doc['ordered_watch_list']
+            doc = next(self.db.users.find({'user_index': int(user_index)}))
+            return doc['sorted_items']
         except StopIteration:
             return []
         except Exception as e:
             print(e)
 
-    def get_index_from_movieId(self, movieId):
-        return self._movies_to_index[movieId]
+    def get_index(self, itemId):
+        return self._itemId_to_index[itemId]
 
-    def get_movieId_from_index(self, index):
-        return self._index_to_movies[index]
+    def get_itemId(self, index):
+        return self._index_to_itemId[index]
 
     @property
-    def total_movies(self):
-        return self._total_movies
+    def total_items(self):
+        return self._total_items
 
     @property
     def total_users(self):
         return self._total_users
-
-    @property
-    def total_raw_data(self):
-        return self._total_raw_data
