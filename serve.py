@@ -17,6 +17,21 @@ def get_api_server(ap_model, redis_client, top_k):
         'version': version
     }
 
+    @app.route("/restore")
+    def restore():
+        ap_model.restore(restore_serve=True)
+        return "restore"
+
+    @app.route("/embedding")
+    def embedding():
+        embeddings = ap_model.get_item_embeddings()
+        print('len: ', len(embeddings), 'embeddings size: ',len(embeddings[0]))
+        response = {
+            'embeddings': embeddings.tolist()
+        }
+
+        return jsonify(response)
+
     @app.route("/info")
     def info():
         return jsonify({'server info': info})
@@ -33,39 +48,54 @@ def get_api_server(ap_model, redis_client, top_k):
     def get_personal_recommendation():
         content = request.json
         userId = content['userId']
-        key = f'userId:{userId}'
-        input_seq = redis_client[key]
+        key = f'ap_mall_userId:{userId}'
 
-        if len(input_seq) == 0:
+        print(key)
+
+        input_itemId_seq = redis_client[key]
+        input_itemId_seq.reverse()
+        input_itemId_seq = [itemId.decode("utf-8") for itemId in input_itemId_seq]
+
+        if len(input_itemId_seq) == 0:
             response = {
                 'message': 'user history does not exist'
             }
 
             return jsonify(response)
 
-        input_seq = [ap_model.get_index_from_movieId(int(movieId)) for movieId in input_seq]
+        input_index_seq = [ap_model.get_index(itemId) for itemId in input_itemId_seq]
+        pad_input_items = np.zeros(ap_model.max_seq_len, np.int32)
+        pad_input_items[:len(input_index_seq)] = input_index_seq
         input = np.zeros(1, dtype=[('seq_item_id', (np.int32, ap_model.max_seq_len)), ('seq_len', np.int32)])
-        input[0] = (input_seq, len(input_seq))
-        logit = np.squeeze(ap_model.serve(input))
-        movie_index = np.argsort(logit)[::-1][:top_k]
+        input[0] = (pad_input_items, len(input_index_seq))
+        user_embedding, logits = ap_model.serve(input)
 
-        movieIds = []
-        for index in movie_index:
-            movieIds.append(ap_model.get_movieId_from_index(index))
-        # print(logit[:10])
-        # print(logit[movie_index])
-        # print(movieIds)
-        input_movies_info = ap_model.get_item_info(input_seq)
-        recommendation_movies_info = ap_model.get_item_info(movieIds)
+        user_embedding = np.squeeze(user_embedding)
+        logit = np.squeeze(logits)
+
+        # print('user_embedding: ', user_embedding)
+
+        #top K
+        item_index = np.argsort(logit)[::-1][:top_k]
+
+        print('top K: ', item_index[:top_k])
+        print('logit: ', logit[:top_k])
+
+        recommendation_itemIds = []
+        for index in item_index:
+            recommendation_itemIds.append(ap_model.get_itemId(index))
+
+
+        items_info = ap_model.get_item_info(input_itemId_seq)
+        recommendation_items_info = ap_model.get_item_info(recommendation_itemIds)
 
         response = {
             'userId': userId,
-            'input_movies_info': input_movies_info,
-            'recommendation_movies_info': recommendation_movies_info
+            'items_info': items_info,
+            'recommendation_items_info': recommendation_items_info
         }
-
-        # print('i: ', response['input_movies_info'])
-        # print('r: ', response['recommendation_movies_info'])
+        for items in recommendation_items_info:
+            print(items["item_index"], items["itemName"])
 
         return jsonify(response)
 
@@ -76,14 +106,13 @@ def serve():
     mongo_config = MongoConfig(host='13.209.6.203',
                                username='romi',
                                password="Amore12345!",
-                               dbname='recsys')
+                               dbname='recsys_apmall')
 
     model_save_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model_save')
 
     ap_model = ApRecsys(model_save_path, mongo_config)
     ap_model.build_serve_model()
     ap_model.restore(restore_serve=True)
-    ap_model.make_movie_index()
 
     redis_config = RedisConnectionConfig()
     redis_client = RedisClient(redis_connection_config=redis_config,

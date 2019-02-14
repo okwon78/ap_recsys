@@ -29,12 +29,6 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
 
         _logits_fc1 = tf.matmul(_in_fc1, _mat_fc1) + _bias_fc1
 
-        # _bn_fc1 = tf.contrib.layers.batch_norm(_logits_fc1, fused=True, decay=0.95,
-        #                                        center=True,
-        #                                        scale=True,
-        #                                        is_training=True,
-        #                                        scope="bn_1",
-        #                                        updates_collections=None)
 
         _out_fc1 = tf.nn.relu(_logits_fc1)
 
@@ -48,28 +42,32 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
 
         _logits_fc2 = tf.matmul(_out_fc1, _mat_fc2) + _bias_fc2
 
-        # _bn_fc2 = tf.contrib.layers.batch_norm(_logits_fc2, fused=True, decay=0.95,
-        #                                        center=True,
-        #                                        scale=True,
-        #                                        is_training=True,
-        #                                        scope="bn_2",
-        #                                        updates_collections=None)
+        _out_fc2 = tf.nn.relu(_logits_fc2) + _out_fc1
 
-        _user_embedding = tf.nn.relu(_logits_fc2)
+        _mat_fc3 = tf.get_variable('FC_3',
+                                   shape=(_out_fc1.shape[1], dim_item_embed),
+                                   trainable=True,
+                                   initializer=tf.contrib.layers.xavier_initializer())
 
-        _mat_fc3 = tf.get_variable('item_embedding',
+        _bias_fc3 = tf.get_variable('bias_3', shape=(dim_item_embed,), trainable=True,
+                                    initializer=tf.constant_initializer(value=0.0, dtype=tf.float32))
+
+        _logits_fc3 = tf.matmul(_out_fc2, _mat_fc3) + _bias_fc3
+
+        _user_embedding = tf.nn.relu(_logits_fc3) + _out_fc1 + _out_fc2
+
+        _mat_fc_last = tf.get_variable('item_embedding',
                                    shape=(dim_item_embed, total_items),
                                    trainable=True,
                                    initializer=tf.contrib.layers.xavier_initializer())
 
-        _logits = tf.matmul(_user_embedding, _mat_fc3)
+        _logits = tf.matmul(_user_embedding, _mat_fc_last)
 
-        _item_embedding = tf.transpose(_mat_fc3)
+        _item_embedding = tf.transpose(_mat_fc_last)
 
         tensors['logits'] = _logits
         tensors['item_embedding'] = _item_embedding
         tensors['user_embedding'] = _user_embedding
-        tensors['debug'] = _logits
 
         tf.summary.histogram('logits', _logits)
 
@@ -104,7 +102,7 @@ class RecModel(object):
         self._train_graph = tf.Graph()
         self._serv_graph = tf.Graph()
 
-    def build_train_model(self, batch_size, embedding_size, dim_item_embed, total_items, max_seq_len):
+    def build_train_model(self, batch_size, dim_item_embed, total_items, max_seq_len):
         """ build train model"""
 
         with self._train_graph.as_default():
@@ -113,7 +111,7 @@ class RecModel(object):
             label = tf.placeholder(tf.int32, shape=(batch_size,), name='label')
 
             _, item_vectors = get_latent_factor(name='latent_factor',
-                                                embedding_size=embedding_size,
+                                                embedding_size=dim_item_embed,
                                                 total_items=total_items,
                                                 tensor_id=seq_item_id)
 
@@ -144,7 +142,7 @@ class RecModel(object):
 
             return tensors
 
-    def build_serve_model(self, embedding_size, dim_item_embed, total_items, max_seq_len):
+    def build_serve_model(self, dim_item_embed, total_items, max_seq_len):
         """ build model for serving and evaluation"""
 
         with self._serv_graph.as_default():
@@ -152,7 +150,7 @@ class RecModel(object):
             seq_len = tf.placeholder(tf.int32, shape=(None,), name='seq_len')
 
             _, item_vectors = get_latent_factor(name='latent_factor',
-                                           embedding_size=embedding_size,
+                                           embedding_size=dim_item_embed,
                                            total_items=total_items,
                                            tensor_id=seq_item_id)
 

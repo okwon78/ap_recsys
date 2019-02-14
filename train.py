@@ -73,6 +73,15 @@ def train():
             summary.value.add(tag='AUC', simple_value=np.mean(eval_results['AUC']))
             summary.value.add(tag='rank_above', simple_value=np.mean(eval_results['rank_above']))
 
+            # save item embedding
+            # item_embeddings = ap_recsys.get_item_embeddings()
+
+            # item_embedding_dict = dict()
+            # for idx, item_embedding in item_embeddings:
+            #     itemId = ap_recsys.get_itemId(idx)
+            #     item_embedding_dict[itemId] = item_embedding
+
+
         ap_recsys.train_writer.add_summary(summary, total_iter)
 
 

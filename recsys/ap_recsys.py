@@ -20,8 +20,7 @@ class ApRecsys(object):
                                   password=mongoConfig.password,
                                   db_name=mongoConfig.dbname)
 
-        self._embedding_size = 100
-        self._dim_item_embed = 100
+        self._dim_item_embed = 50
         self._max_seq_len = 10
         self._batch_size = 100
         self._eval_iter = 1000
@@ -41,7 +40,7 @@ class ApRecsys(object):
 
         self._eval_manager = EvalManager()
         self._eval_histories_sample = dict()
-        self._min_eval_item_count = 100
+        self._min_eval_item_count = 10
         self._flag_updated = False
 
         self._save_model_dir = model_dir
@@ -115,7 +114,7 @@ class ApRecsys(object):
     def get_index(self, itemId):
         return self._mongo.get_index(itemId)
 
-    def get_movie_info(self, movieId):
+    def get_item_info(self, movieId):
         return self._mongo.get_item_info(movieId)
 
     def _train_batch(self):
@@ -157,7 +156,8 @@ class ApRecsys(object):
     def _eval_batch(self):
 
         if len(self._eval_histories_sample) == 0:
-            low_pos = max(self._min_eval_item_count, int(self._mongo.total_users * self._eval_percentage))
+            # low_pos = max(self._min_eval_item_count, int(self._mongo.total_users * self._eval_percentage))
+            low_pos =self._min_eval_item_count
 
             index_list = np.arange(start=0, stop=low_pos, step=1)
             for ind in index_list:
@@ -190,7 +190,6 @@ class ApRecsys(object):
     def build_train_model(self):
 
         self._train_tensors = self._model.build_train_model(batch_size=self._batch_size,
-                                                            embedding_size=self._embedding_size,
                                                             dim_item_embed=self.dim_item_embed,
                                                             total_items=self._mongo.total_items,
                                                             max_seq_len=self.max_seq_len)
@@ -205,8 +204,7 @@ class ApRecsys(object):
 
     def build_serve_model(self):
 
-        self._serve_tensors = self._model.build_serve_model(embedding_size=self._embedding_size,
-                                                            dim_item_embed=self.dim_item_embed,
+        self._serve_tensors = self._model.build_serve_model(dim_item_embed=self.dim_item_embed,
                                                             total_items=self._mongo.total_items,
                                                             max_seq_len=self.max_seq_len)
 
@@ -254,12 +252,12 @@ class ApRecsys(object):
                 self._serve_tensors['seq_len']: input['seq_len']
             }
 
-            debug_opt = self._serve_tensors['debug']
+            user_embedding_, logits_ = self._serve_session.run([user_embedding, logits], feed_dict=feed_dict)
 
-            debug_out_, user_embedding_, logits_ = self._serve_session.run([debug_opt, user_embedding, logits], feed_dict=feed_dict)
             # print('seq_item_id: ', input['seq_item_id'])
-            # print('debug: ', debug_out_[:10])
-            return logits_
+            # print('logits_: ', logits_[:10])
+
+            return user_embedding_, logits_
 
     def evaluate(self, eval_sampler, step):
         metric_results = defaultdict(list)
@@ -267,7 +265,9 @@ class ApRecsys(object):
         completed_user_count = 0
         pos_item, input = eval_sampler.next_batch()
         while input is not None:
-            scores = np.squeeze(self.serve(input))
+            user_embedding, logits = self.serve(input)
+            # print('user_embedding: ',  user_embedding)
+            scores = np.squeeze(logits)
             result, rank_above = self._eval_manager.full_eval(pos_sample=pos_item, predictions=scores)
             completed_user_count += 1
 
@@ -279,6 +279,12 @@ class ApRecsys(object):
             pos_item, input = eval_sampler.next_batch()
 
         return metric_results
+
+    def get_item_embeddings(self):
+        with self._model.get_serve_graph().as_default():
+            item_embedding = self._serve_tensors['item_embedding']
+            item_embedding = self._serve_session.run([item_embedding])
+            return np.squeeze(item_embedding)
 
     def save(self):
         with self._model.get_train_graph().as_default():

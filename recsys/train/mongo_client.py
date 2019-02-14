@@ -98,6 +98,7 @@ class MongoClient(object):
             '_id': 0,
             'itemId': 1,
             'itemName': 1,
+            'item_index': 1,
             'url': 1
         }
 
@@ -107,7 +108,6 @@ class MongoClient(object):
             item_infos.append(doc)
 
         return item_infos
-
 
     def get_item_list(self, user_index):
 
