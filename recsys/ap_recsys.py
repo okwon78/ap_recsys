@@ -278,7 +278,7 @@ class ApRecsys(object):
 
             pos_item, input = eval_sampler.next_batch()
 
-         return metric_results
+        return metric_results
 
     def save(self):
         with self._model.get_train_graph().as_default():
