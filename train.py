@@ -25,7 +25,6 @@ def train():
 
     ap_recsys = ApRecsys(model_save_path, mongo_config)
 
-    # ap_recsys.make_raw_data()
     ap_recsys.make_movie_index()
 
     train_sampler = ap_recsys.get_train_sampler()
