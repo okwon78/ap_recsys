@@ -56,14 +56,14 @@ def get_MultiLayerFC(name, dim_item_embed, total_items, tensor_in_tensor):
 
         _user_embedding = tf.nn.relu(_logits_fc3) + _out_fc1 + _out_fc2
 
-        _mat_fc_last = tf.get_variable('item_embedding',
-                                   shape=(dim_item_embed, total_items),
+        _item_embedding = tf.get_variable('item_embedding',
+                                   shape=(total_items, dim_item_embed),
                                    trainable=True,
                                    initializer=tf.contrib.layers.xavier_initializer())
 
-        _logits = tf.matmul(_user_embedding, _mat_fc_last)
-
-        _item_embedding = tf.transpose(_mat_fc_last)
+        _user_embedding = tf.transpose(_user_embedding)
+        _logits = tf.matmul(_item_embedding, _user_embedding)
+        _logits = tf.transpose(_logits)
 
         tensors['logits'] = _logits
         tensors['item_embedding'] = _item_embedding
