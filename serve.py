@@ -91,7 +91,7 @@ def get_api_server(ap_model, redis_client, top_k):
 
         response = {
             'userId': userId,
-            'items_info': items_info,
+            'history_items_info': items_info,
             'recommendation_items_info': recommendation_items_info
         }
         for items in recommendation_items_info:
