@@ -85,12 +85,18 @@ class MongoClient(object):
         projection = {
             '_id': 0,
             'item_index': 1,
+            'itemName': 1,
             'itemId': 1
         }
+        tsv_file_path = 'item_label.tsv'
 
-        for doc in self.db.items.find({}, projection):
-            self._itemId_to_index[doc['itemId']] = doc['item_index']
-            self._index_to_itemId[doc['item_index']] = doc['itemId']
+        with open(tsv_file_path, 'w') as f:
+            f.write("Index\tLabel\n")
+            for doc in self.db.items.find({}, projection):
+                self._itemId_to_index[doc['itemId']] = doc['item_index']
+                self._index_to_itemId[doc['item_index']] = doc['itemId']
+                f.write("{}\t{}\n".format(doc['item_index'], doc['itemName']))
+
 
     def get_item_info(self, itemIds):
 
